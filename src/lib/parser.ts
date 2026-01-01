@@ -18,39 +18,55 @@ export interface TrainingWeek {
 }
 
 export const parseRawCsv = (csvText: string): string[][] => {
-    // We use dynamicTyping: false to preserve exact string representations (e.g. "0.80" vs "0.8")
+    // We use dynamicTyping: false to preserve exact string representations
     // We use header: false to get a raw grid
     const { data } = Papa.parse(csvText, {
         header: false,
-        skipEmptyLines: false, // Keep empty lines to preserve file structure vertically
+        skipEmptyLines: false, // Keep empty lines to preserve file structure
     });
     return data as string[][];
 };
 
 export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
     // Data starts at index 10 (line 11)
-    // Structure:
-    // 0-2: Empty
-    // 3: Weeks until race
-    // 4: Fraction
-    // 5: Q1 Desc
-    // 6: Q1 Notes
-    // 7: Q2 Desc
-    // 8: Q2 Notes
-    // 9: Easy Mileage
-    // 10: Actual
-    // 11: Difference
-    // 12: Weekly Notes
+    // Row 10 is Header. Check header length to determine layout.
+    const headerRow = rawRows[9]; // Line 10
+    // Check if we have the "shifted" layout (approx 15 cols) vs original (approx 13)
+    const isShiftedLayout = headerRow && headerRow.length >= 15;
+
+    // Layout configuration
+    const IDX = isShiftedLayout ? {
+        WEEKS: 3,
+        FRACTION: 4,
+        Q1_DESC: 5,
+        Q1_NOTE: 6,
+        // Column 7 is extra (e.g. " for Q1")
+        Q2_DESC: 8, // Shifted from 7
+        Q2_NOTE: 9, // Shifted from 8
+        // Column 10 is extra (e.g. " for Q2")
+        EASY: 11,   // Shifted from 9
+        ACTUAL: 12, // Shifted from 10
+        DIFF: 13,   // Shifted from 11
+        NOTES: 14   // Shifted from 12
+    } : {
+        WEEKS: 3,
+        FRACTION: 4,
+        Q1_DESC: 5,
+        Q1_NOTE: 6,
+        Q2_DESC: 7,
+        Q2_NOTE: 8,
+        EASY: 9,
+        ACTUAL: 10,
+        DIFF: 11,
+        NOTES: 12
+    };
 
     const weeks: TrainingWeek[] = [];
 
-    // Slice from line 10 to end
-    // Loop through and map safely
     for (let i = 10; i < rawRows.length; i++) {
         const row = rawRows[i];
-        if (!row || row.length < 5) continue; // Skip evidently empty/malformed rows
+        if (!row || row.length < 5) continue;
 
-        // Helper
         const getNum = (idx: number) => {
             const val = row[idx];
             if (!val) return undefined;
@@ -60,23 +76,22 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
         const getStr = (idx: number) => row[idx] || '';
 
         const w: TrainingWeek = {
-            weeksUntilRace: getNum(3) || 0,
-            fractionOfPeak: getNum(4) || 0,
+            weeksUntilRace: getNum(IDX.WEEKS) || 0,
+            fractionOfPeak: getNum(IDX.FRACTION) || 0,
             q1: {
-                description: getStr(5),
-                notes: getStr(6),
+                description: getStr(IDX.Q1_DESC),
+                notes: getStr(IDX.Q1_NOTE),
             },
             q2: {
-                description: getStr(7),
-                notes: getStr(8),
+                description: getStr(IDX.Q2_DESC),
+                notes: getStr(IDX.Q2_NOTE),
             },
-            weeklyEasyMileage: getNum(9) || 0,
-            actualMileage: getNum(10),
-            difference: getNum(11),
-            notes: getStr(12)
+            weeklyEasyMileage: getNum(IDX.EASY) || 0,
+            actualMileage: getNum(IDX.ACTUAL),
+            difference: getNum(IDX.DIFF),
+            notes: getStr(IDX.NOTES)
         };
 
-        // Filter based on existing valid data to avoid showing empty trailing rows
         if (w.weeksUntilRace !== 0 || w.q1.description !== '') {
             weeks.push(w);
         }
@@ -85,31 +100,37 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
 };
 
 export const updateRawData = (rawRows: string[][], weekIndex: number, updatedWeek: TrainingWeek): string[][] => {
-    // The first week in `weeks` corresponds to rawRows[10].
-    // weekIndex 0 -> rawRows[10]
-
     const targetRowIndex = 10 + weekIndex;
+    if (targetRowIndex >= rawRows.length) return rawRows;
 
-    if (targetRowIndex >= rawRows.length) return rawRows; // Out of bounds?
+    const headerRow = rawRows[9];
+    const isShiftedLayout = headerRow && headerRow.length >= 15;
 
-    const newRows = [...rawRows]; // Shallow copy array
-    const newRow = [...(newRows[targetRowIndex] || [])]; // Shallow copy row
+    const IDX = isShiftedLayout ? {
+        Q1_NOTE: 6,
+        Q2_NOTE: 9,
+        ACTUAL: 12,
+        NOTES: 14
+    } : {
+        Q1_NOTE: 6,
+        Q2_NOTE: 8,
+        ACTUAL: 10,
+        NOTES: 12
+    };
+
+    const newRows = [...rawRows];
+    // Use safe copy
+    const newRow = [...(newRows[targetRowIndex] || [])];
 
     // Ensure row has enough columns
-    while (newRow.length < 13) newRow.push('');
+    const minCols = isShiftedLayout ? 15 : 13;
+    while (newRow.length < minCols) newRow.push('');
 
-    // Update ONLY editable fields
-    // Actual: Index 10
-    newRow[10] = updatedWeek.actualMileage !== undefined ? String(updatedWeek.actualMileage) : '';
-
-    // Weekly Notes: Index 12
-    newRow[12] = updatedWeek.notes || '';
-
-    // Q1 Notes: Index 6
-    newRow[6] = updatedWeek.q1.notes || '';
-
-    // Q2 Notes: Index 8
-    newRow[8] = updatedWeek.q2.notes || '';
+    // Update fields
+    newRow[IDX.ACTUAL] = updatedWeek.actualMileage !== undefined ? String(updatedWeek.actualMileage) : '';
+    newRow[IDX.NOTES] = updatedWeek.notes || '';
+    newRow[IDX.Q1_NOTE] = updatedWeek.q1.notes || '';
+    newRow[IDX.Q2_NOTE] = updatedWeek.q2.notes || '';
 
     newRows[targetRowIndex] = newRow;
     return newRows;
@@ -117,8 +138,6 @@ export const updateRawData = (rawRows: string[][], weekIndex: number, updatedWee
 
 export const rawToCSV = (rawRows: string[][]): string => {
     return Papa.unparse(rawRows, {
-        quotes: true, // Force quotes for safety, or let Papa decide?
-        // If we want "exact as possible", maybe default is better.
-        // Papa defaults to quoting only when necessary.
+        quotes: true,
     });
 };
