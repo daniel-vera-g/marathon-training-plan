@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { type TrainingWeek, parseRawCsv, getWeeksFromRaw, updateRawData, rawToCSV } from './lib/parser';
+import { type GitHubConfig, saveToGitHub } from './lib/github';
 import { WeekCard } from './components/WeekCard';
-import { Activity, Trophy, Calendar, Check } from 'lucide-react';
+import { Activity, Trophy, Calendar, Check, Settings, X, Github } from 'lucide-react';
 
 function App() {
   const [weeks, setWeeks] = useState<TrainingWeek[]>([]);
@@ -11,9 +12,26 @@ function App() {
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
+  // GitHub Config State
+  const [showSettings, setShowSettings] = useState(false);
+  const [ghConfig, setGhConfig] = useState<GitHubConfig | null>(null);
+
+  // Settings Form State
+  const [repoUrl, setRepoUrl] = useState('');
+  const [ghToken, setGhToken] = useState('');
+
   const currentWeekRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Load config from local storage
+    const savedConfig = localStorage.getItem('gh_config');
+    if (savedConfig) {
+      const config = JSON.parse(savedConfig);
+      setGhConfig(config);
+      setRepoUrl(`https://github.com/${config.owner}/${config.repo}`);
+      setGhToken(config.token);
+    }
+
     fetch('/plan.csv')
       .then(response => {
         if (!response.ok) throw new Error('Failed to load training plan');
@@ -37,17 +55,59 @@ function App() {
       });
   }, []);
 
+
+  const handleSaveSettings = () => {
+    try {
+      // Parse "user/repo" or full URL
+      const cleanRepo = repoUrl.replace('https://github.com/', '').split('/');
+      if (cleanRepo.length < 2) {
+        alert('Please enter a valid "owner/repo" or full URL');
+        return;
+      }
+
+      const config: GitHubConfig = {
+        token: ghToken,
+        owner: cleanRepo[0],
+        repo: cleanRepo[1],
+        branch: 'main', // Default to main for now
+        path: 'public/plan.csv'
+      };
+
+      setGhConfig(config);
+      localStorage.setItem('gh_config', JSON.stringify(config));
+      setShowSettings(false);
+      alert('Settings saved!');
+    } catch (e) {
+      alert('Invalid settings');
+    }
+  };
+
+  const handleClearSettings = () => {
+    setGhConfig(null);
+    setRepoUrl('');
+    setGhToken('');
+    localStorage.removeItem('gh_config');
+    setShowSettings(false);
+  };
+
   const savePlan = async (currentGrid: string[][]) => {
     setSaving(true);
     try {
-      // Convert raw grid back to CSV
       const csvText = rawToCSV(currentGrid);
-      const res = await fetch('/api/save', {
-        method: 'POST',
-        body: csvText,
-        headers: { 'Content-Type': 'text/plain' }
-      });
-      if (!res.ok) throw new Error('Failed to save');
+
+      if (ghConfig) {
+        // GITHUB MODE
+        await saveToGitHub(ghConfig, csvText);
+      } else {
+        // LOCAL DEV MODE
+        const res = await fetch('/api/save', {
+          method: 'POST',
+          body: csvText,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+        if (!res.ok) throw new Error('Failed to save');
+      }
+
       setLastSaved(new Date());
     } catch (e) {
       console.error(e);
@@ -125,11 +185,20 @@ function App() {
                 <Calendar className="w-4 h-4" />
                 <span>2Q Program</span>
               </div>
-              <div className="hidden sm:block h-4 w-[1px] bg-white/10" />
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4" />
                 <span>{weeks.length} Weeks</span>
               </div>
+
+              <div className="hidden sm:block h-4 w-[1px] bg-white/10" />
+
+              <button
+                onClick={() => setShowSettings(true)}
+                className="flex items-center gap-2 hover:text-white transition-colors"
+                title="Settings"
+              >
+                <Settings className={`w-4 h-4 ${ghConfig ? 'text-blue-400' : ''}`} />
+              </button>
             </div>
           </div>
         </div>
@@ -165,6 +234,66 @@ function App() {
           </>
         )}
       </main>
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Github className="w-5 h-5" />
+                GitHub Sync
+              </h2>
+              <button onClick={() => setShowSettings(false)} className="text-white/40 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-white/40 mb-1.5">Repository URL</label>
+                <input
+                  type="text"
+                  value={repoUrl}
+                  onChange={(e) => setRepoUrl(e.target.value)}
+                  placeholder="https://github.com/user/repo"
+                  className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-white/40 mb-1.5">Personal Access Token</label>
+                <input
+                  type="password"
+                  value={ghToken}
+                  onChange={(e) => setGhToken(e.target.value)}
+                  placeholder="ghp_xxxxxxxxxxxx"
+                  className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none transition-colors"
+                />
+                <p className="text-[10px] text-white/20 mt-1.5 leading-relaxed">
+                  Token requires <code>repo</code> scope. Stored locally in your browser.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-8">
+              {ghConfig && (
+                <button
+                  onClick={handleClearSettings}
+                  className="px-4 py-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm font-medium transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                onClick={handleSaveSettings}
+                className="ml-auto px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors shadow-lg shadow-blue-500/20"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <footer className="py-8 text-center text-white/20 text-xs">
         <p>Training Plan Viewer • Built with React & Tailwind</p>
