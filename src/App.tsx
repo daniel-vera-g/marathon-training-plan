@@ -21,6 +21,7 @@ function App() {
   const [ghToken, setGhToken] = useState('');
 
   const currentWeekRef = useRef<HTMLDivElement>(null);
+  const isUserChange = useRef(false);
 
   useEffect(() => {
     // Load config from local storage
@@ -131,6 +132,7 @@ function App() {
 
     // 2. Update Raw Grid state
     if (rawGrid.length > 0) {
+      isUserChange.current = true;
       const newGrid = updateRawData(rawGrid, index, newWeek);
       setRawGrid(newGrid);
     }
@@ -143,7 +145,7 @@ function App() {
 
   // Debounce autosave on RAW GRID change
   useEffect(() => {
-    if (rawGrid.length === 0 || loading || isReadOnly) return;
+    if (rawGrid.length === 0 || loading || isReadOnly || !isUserChange.current) return;
     const timer = setTimeout(() => {
       savePlan(rawGrid);
     }, 1500);

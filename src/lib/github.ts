@@ -21,7 +21,7 @@ export const saveToGitHub = async (config: GitHubConfig, content: string): Promi
 
         if (!getRes.ok) {
             console.error('Failed to fetch file info from GitHub');
-            throw new Error(`GitHub API Error: ${getRes.statusText}`);
+            throw new Error(`GitHub API Error: ${getRes.status} ${getRes.statusText}`);
         }
 
         const getData = await getRes.json();
@@ -54,7 +54,7 @@ export const saveToGitHub = async (config: GitHubConfig, content: string): Promi
 
         if (!putRes.ok) {
             console.error('Failed to update file on GitHub');
-            throw new Error(`GitHub API Error: ${putRes.statusText}`);
+            throw new Error(`GitHub API Error: ${putRes.status} ${putRes.statusText}`);
         }
 
         return true;
