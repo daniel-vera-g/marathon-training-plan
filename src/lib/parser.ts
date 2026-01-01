@@ -92,10 +92,10 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
         FRACTION: 4,
         Q1_DESC: 5,
         Q1_NOTE: 6,
-        // Column 7 is extra (e.g. " for Q1")
+        Q1_DIST: 7, // Explicit distance
         Q2_DESC: 8, // Shifted from 7
         Q2_NOTE: 9, // Shifted from 8
-        // Column 10 is extra (e.g. " for Q2")
+        Q2_DIST: 10, // Explicit distance
         EASY: 11,   // Shifted from 9
         ACTUAL: 12, // Shifted from 10
         DIFF: 13,   // Shifted from 11
@@ -105,8 +105,10 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
         FRACTION: 4,
         Q1_DESC: 5,
         Q1_NOTE: 6,
+        Q1_DIST: -1, // Not available
         Q2_DESC: 7,
         Q2_NOTE: 8,
+        Q2_DIST: -1, // Not available
         EASY: 9,
         ACTUAL: 10,
         DIFF: 11,
@@ -120,6 +122,7 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
         if (!row || row.length < 5) continue;
 
         const getNum = (idx: number) => {
+            if (idx < 0) return undefined;
             const val = row[idx];
             if (!val) return undefined;
             const parsed = parseFloat(val);
@@ -129,6 +132,8 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
 
         const q1Desc = getStr(IDX.Q1_DESC);
         const q2Desc = getStr(IDX.Q2_DESC);
+        const q1Dist = getNum(IDX.Q1_DIST);
+        const q2Dist = getNum(IDX.Q2_DIST);
 
         const w: TrainingWeek = {
             weeksUntilRace: getNum(IDX.WEEKS) || 0,
@@ -136,12 +141,12 @@ export const getWeeksFromRaw = (rawRows: string[][]): TrainingWeek[] => {
             q1: {
                 description: q1Desc,
                 notes: getStr(IDX.Q1_NOTE),
-                targetDistance: extractDistance(q1Desc)
+                targetDistance: q1Dist ?? extractDistance(q1Desc)
             },
             q2: {
                 description: q2Desc,
                 notes: getStr(IDX.Q2_NOTE),
-                targetDistance: extractDistance(q2Desc)
+                targetDistance: q2Dist ?? extractDistance(q2Desc)
             },
             weeklyEasyMileage: getNum(IDX.EASY) || 0,
             actualMileage: getNum(IDX.ACTUAL),
