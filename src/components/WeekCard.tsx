@@ -6,10 +6,11 @@ import { cn } from '../lib/utils';
 interface WeekCardProps {
     week: TrainingWeek;
     isCurrent?: boolean;
+    readOnly?: boolean;
     onUpdate: (updatedWeek: TrainingWeek) => void;
 }
 
-const WorkoutSection = ({ title, workout, colorClass, onNotesChange }: { title: string, workout: Workout, colorClass: string, onNotesChange: (notes: string) => void }) => (
+const WorkoutSection = ({ title, workout, colorClass, onNotesChange, readOnly }: { title: string, workout: Workout, colorClass: string, onNotesChange: (notes: string) => void, readOnly?: boolean }) => (
     <div className={cn("p-4 rounded-xl bg-white/5 border border-white/10 flex-1 min-w-[300px] flex flex-col", colorClass)}>
         <div className="flex items-center gap-2 mb-2">
             <Dumbbell className="w-4 h-4 opacity-70" />
@@ -21,13 +22,20 @@ const WorkoutSection = ({ title, workout, colorClass, onNotesChange }: { title: 
 
         <div className="mt-auto group/notes">
             <label className="text-[10px] uppercase tracking-wider opacity-30 mb-1 block group-focus-within/notes:text-blue-400 decoration-slice">Workout Notes</label>
-            <div className="flex gap-2 items-start bg-black/20 p-2 rounded focus-within:ring-1 focus-within:ring-blue-500/50 transition-all">
+            <div className={cn(
+                "flex gap-2 items-start bg-black/20 p-2 rounded transition-all",
+                !readOnly && "focus-within:ring-1 focus-within:ring-blue-500/50"
+            )}>
                 <StickyNote className="w-3 h-3 mt-1 shrink-0 opacity-50" />
                 <textarea
                     value={workout.notes || ''}
                     onChange={(e) => onNotesChange(e.target.value)}
-                    placeholder="Add workout notes..."
-                    className="w-full bg-transparent outline-none resize-y text-sm text-white/70 placeholder:text-white/20 min-h-[60px]"
+                    readOnly={readOnly}
+                    placeholder={readOnly ? "No notes" : "Add workout notes..."}
+                    className={cn(
+                        "w-full bg-transparent outline-none resize-y text-sm text-white/70 min-h-[60px]",
+                        readOnly ? "cursor-default text-white/40 resize-none" : "placeholder:text-white/20"
+                    )}
                     style={{ fieldSizing: 'content' } as any}
                 />
             </div>
@@ -35,7 +43,7 @@ const WorkoutSection = ({ title, workout, colorClass, onNotesChange }: { title: 
     </div>
 );
 
-export const WeekCard = React.forwardRef<HTMLDivElement, WeekCardProps>(({ week, isCurrent, onUpdate }, ref) => {
+export const WeekCard = React.forwardRef<HTMLDivElement, WeekCardProps>(({ week, isCurrent, onUpdate, readOnly }, ref) => {
     const isDone = week.actualMileage !== undefined && week.actualMileage > 0;
 
     const handleActualChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,12 +126,14 @@ export const WeekCard = React.forwardRef<HTMLDivElement, WeekCardProps>(({ week,
                         workout={week.q1}
                         colorClass="hover:bg-orange-500/5 hover:border-orange-500/20 transition-colors"
                         onNotesChange={handleQ1NotesChange}
+                        readOnly={readOnly}
                     />
                     <WorkoutSection
                         title="Quality Session 2"
                         workout={week.q2}
                         colorClass="hover:bg-purple-500/5 hover:border-purple-500/20 transition-colors"
                         onNotesChange={handleQ2NotesChange}
+                        readOnly={readOnly}
                     />
                 </div>
 
@@ -146,8 +156,14 @@ export const WeekCard = React.forwardRef<HTMLDivElement, WeekCardProps>(({ week,
                                     type="number"
                                     value={week.actualMileage ?? ''}
                                     onChange={handleActualChange}
-                                    placeholder="0"
-                                    className="bg-transparent font-mono font-medium outline-none border-b border-white/10 focus:border-blue-500 w-20 py-0.5 transition-colors placeholder:text-white/10 text-lg"
+                                    placeholder={readOnly ? "-" : "0"}
+                                    disabled={readOnly}
+                                    className={cn(
+                                        "bg-transparent font-mono font-medium outline-none border-b w-20 py-0.5 transition-colors text-lg",
+                                        readOnly
+                                            ? "border-transparent text-white/50 cursor-default"
+                                            : "border-white/10 focus:border-blue-500 placeholder:text-white/10"
+                                    )}
                                 />
                                 <span className="text-sm text-white/40">km</span>
                             </div>
@@ -173,8 +189,12 @@ export const WeekCard = React.forwardRef<HTMLDivElement, WeekCardProps>(({ week,
                         <textarea
                             value={week.notes || ''}
                             onChange={handleWeeklyNotesChange}
-                            placeholder="Add generic weekly notes here..."
-                            className="w-full bg-transparent outline-none resize-y text-sm text-white/80 placeholder:text-white/20 min-h-[80px]"
+                            readOnly={readOnly}
+                            placeholder={readOnly ? "No notes" : "Add generic weekly notes here..."}
+                            className={cn(
+                                "w-full bg-transparent outline-none resize-y text-sm text-white/80 min-h-[80px]",
+                                readOnly ? "cursor-default text-white/50 resize-none" : "placeholder:text-white/20"
+                            )}
                             style={{ fieldSizing: 'content' } as any}
                         />
                     </div>

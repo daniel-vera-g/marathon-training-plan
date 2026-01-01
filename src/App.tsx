@@ -156,6 +156,11 @@ function App() {
     }
   }, [loading]);
 
+  // Read Only Mode determined by:
+  // 1. Production Build AND
+  // 2. No GitHub Config present
+  const isReadOnly = import.meta.env.PROD && !ghConfig;
+
   return (
     <div className="min-h-screen bg-[#111] text-white selection:bg-blue-500/30">
 
@@ -171,17 +176,24 @@ function App() {
           <div className="flex items-center gap-6">
             {/* Save Status */}
             <div className="flex items-center gap-2 text-xs font-medium transition-colors">
-              {saving ? (
-                <span className="text-yellow-400 flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-                  Saving...
+              {!isReadOnly && (
+                saving ? (
+                  <span className="text-yellow-400 flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                    Saving...
+                  </span>
+                ) : lastSaved ? (
+                  <span className="text-emerald-400 flex items-center gap-1.5 opacity-50">
+                    <Check className="w-3 h-3" />
+                    Saved
+                  </span>
+                ) : null
+              )}
+              {isReadOnly && (
+                <span className="text-white/30 flex items-center gap-1.5 border border-white/10 px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                  Read Only
                 </span>
-              ) : lastSaved ? (
-                <span className="text-emerald-400 flex items-center gap-1.5 opacity-50">
-                  <Check className="w-3 h-3" />
-                  Saved
-                </span>
-              ) : null}
+              )}
             </div>
 
             <div className="flex items-center gap-4 text-sm font-medium text-white/50">
@@ -232,6 +244,7 @@ function App() {
                   week={week}
                   isCurrent={index === currentWeekIndex}
                   onUpdate={(newWeek) => handleUpdate(index, newWeek)}
+                  readOnly={isReadOnly}
                 />
               ))}
             </div>
