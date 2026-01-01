@@ -32,7 +32,11 @@ function App() {
       setGhToken(config.token);
     }
 
-    fetch('/plan.csv')
+    // Fix: Use correct base path for fetching assets
+    // When base is '/marathon-training-plan/', the file is at '/marathon-training-plan/plan.csv'
+    const planUrl = import.meta.env.BASE_URL + 'plan.csv';
+
+    fetch(planUrl)
       .then(response => {
         if (!response.ok) throw new Error('Failed to load training plan');
         return response.text();
